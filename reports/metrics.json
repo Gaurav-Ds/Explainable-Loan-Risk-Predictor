@@ -1,0 +1,76 @@
+{
+  "best_model": "Random Forest",
+  "selection_criterion": "5-fold cross-validated ROC-AUC on training set",
+  "decision_threshold": 0.5,
+  "n_train": 800,
+  "n_test": 200,
+  "models": {
+    "Logistic Regression": {
+      "accuracy": 0.76,
+      "precision": 0.5697674418604651,
+      "recall": 0.8166666666666667,
+      "f1": 0.6712328767123288,
+      "roc_auc": 0.8141666666666666,
+      "confusion_matrix": {
+        "tn": 103,
+        "fp": 37,
+        "fn": 11,
+        "tp": 49
+      },
+      "cv_roc_auc_mean": 0.7677455357142857,
+      "cv_roc_auc_std": 0.058139430560920836
+    },
+    "Random Forest": {
+      "accuracy": 0.75,
+      "precision": 0.5625,
+      "recall": 0.75,
+      "f1": 0.6428571428571429,
+      "roc_auc": 0.8111904761904762,
+      "confusion_matrix": {
+        "tn": 105,
+        "fp": 35,
+        "fn": 15,
+        "tp": 45
+      },
+      "cv_roc_auc_mean": 0.7950520833333333,
+      "cv_roc_auc_std": 0.045926094433425116
+    },
+    "XGBoost": {
+      "accuracy": 0.75,
+      "precision": 0.5657894736842105,
+      "recall": 0.7166666666666667,
+      "f1": 0.6323529411764706,
+      "roc_auc": 0.7960714285714285,
+      "confusion_matrix": {
+        "tn": 107,
+        "fp": 33,
+        "fn": 17,
+        "tp": 43
+      },
+      "cv_roc_auc_mean": 0.7879464285714286,
+      "cv_roc_auc_std": 0.03753515600986743
+    }
+  },
+  "global_importance": {
+    "checking_status": 0.10704,
+    "duration_months": 0.0401,
+    "savings": 0.03596,
+    "credit_history": 0.03026,
+    "other_installment_plans": 0.02296,
+    "property": 0.01949,
+    "purpose": 0.01902,
+    "credit_amount": 0.01856,
+    "employment_since": 0.01758,
+    "housing": 0.01645,
+    "age": 0.01306,
+    "installment_rate": 0.01048,
+    "telephone": 0.00857,
+    "job": 0.00532,
+    "other_debtors": 0.0039,
+    "foreign_worker": 0.0034,
+    "residence_since": 0.0024,
+    "existing_credits": 0.00213,
+    "num_dependents": 0.00139
+  },
+  "shap_units": "probability"
+}

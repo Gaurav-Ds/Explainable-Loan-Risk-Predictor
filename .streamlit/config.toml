@@ -1,0 +1,17 @@
+# Default look = dark. The in-app Dark/Light button switches these at runtime (see THEMES in app.py).
+[theme]
+base = "dark"
+primaryColor = "#3987e5"
+backgroundColor = "#0b1324"
+secondaryBackgroundColor = "#14203a"
+textColor = "#e6edf7"
+borderColor = "#24324f"
+showWidgetBorder = true
+baseRadius = "0.7rem"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+
+[theme.sidebar]
+backgroundColor = "#0f1a2e"
+
+[server]
+headless = true

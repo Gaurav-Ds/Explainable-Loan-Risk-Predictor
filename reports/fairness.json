@@ -1,0 +1,54 @@
+{
+  "gender": {
+    "attribute": "gender",
+    "groups": [
+      {
+        "group": "Female",
+        "count": 61,
+        "actual_good_rate": 0.6721,
+        "approval_rate": 0.5574,
+        "true_approval_rate": 0.7073,
+        "false_approval_rate": 0.25
+      },
+      {
+        "group": "Male",
+        "count": 139,
+        "actual_good_rate": 0.7122,
+        "approval_rate": 0.6187,
+        "true_approval_rate": 0.7677,
+        "false_approval_rate": 0.25
+      }
+    ],
+    "demographic_parity_difference": 0.0613,
+    "equal_opportunity_difference": 0.0604,
+    "disparate_impact_ratio": 0.9009,
+    "least_favoured_group": "Female",
+    "verdict": "No significant disparity detected (all differences within 10% and DI ratio >= 0.80)."
+  },
+  "age_group": {
+    "attribute": "age_group",
+    "groups": [
+      {
+        "group": "25 and over",
+        "count": 161,
+        "actual_good_rate": 0.7453,
+        "approval_rate": 0.646,
+        "true_approval_rate": 0.7833,
+        "false_approval_rate": 0.2439
+      },
+      {
+        "group": "Under 25",
+        "count": 39,
+        "actual_good_rate": 0.5128,
+        "approval_rate": 0.4103,
+        "true_approval_rate": 0.55,
+        "false_approval_rate": 0.2632
+      }
+    ],
+    "demographic_parity_difference": 0.2357,
+    "equal_opportunity_difference": 0.2333,
+    "disparate_impact_ratio": 0.6351,
+    "least_favoured_group": "Under 25",
+    "verdict": "Potential disparity: approval rates differ by 24%; creditworthy applicants are approved at rates differing by 23%; disparate impact ratio 0.64 is below the 0.80 four-fifths rule."
+  }
+}

@@ -1,0 +1,11 @@
+# Tested with Python 3.13 on Windows 11. Exact versions keep saved models reproducible.
+pandas==3.0.6
+numpy==2.5.3
+scikit-learn==1.9.1
+xgboost==3.4.1
+shap==0.52.0
+matplotlib==3.11.2
+streamlit==1.65.0
+plotly==7.1.0
+joblib==1.6.0
+pytest==9.1.1
