@@ -34,8 +34,19 @@ reports/fairness.json         fairness audit
 reports/figures/              comparison, ROC, SHAP and fairness charts
 ```
 
+## Requirements
+- **Python 3.12 or 3.13** (required — numpy, xgboost and shap in `requirements.txt` do not support 3.11 or older).
+  Check with `python --version`; download from https://www.python.org/downloads/ if needed.
+- Git, and about 1 GB of free disk space for the libraries.
+- No internet is needed after installation (the dataset is included in `data/raw/`).
+
 ## How to run
+The repository already contains the trained models, so after installing you can go straight to
+`streamlit run app.py`. The prepare/train steps rebuild everything from the raw data (≈1 minute).
+
 ```bash
+git clone https://github.com/Gaurav-Ds/Explainable-Loan-Risk-Predictor.git
+cd Explainable-Loan-Risk-Predictor
 python -m venv .venv
 .venv\Scripts\activate            # Windows  (Linux/Mac: source .venv/bin/activate)
 pip install -r requirements.txt
@@ -45,6 +56,15 @@ python src/train.py               # train, compare, explain, audit -> models/ & 
 python -m pytest tests -q         # 21 automated tests (~1-2 min)
 streamlit run app.py              # open http://localhost:8501
 ```
+
+### Troubleshooting
+| Problem | Fix |
+|---|---|
+| `No matching distribution found for numpy==...` | Your Python is older than 3.12 — install Python 3.12/3.13 and recreate `.venv`. |
+| `streamlit: command not found` / not recognized | Activate the virtual environment first, or run `python -m streamlit run app.py`. |
+| `activate` blocked in PowerShell | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use Command Prompt. |
+| "Model not found" in the app | Run `python src/prepare_data.py` then `python src/train.py`. |
+| Port 8501 already in use | `streamlit run app.py --server.port 8502` |
 
 ## Results (held-out test set, 200 applicants, threshold 0.5)
 | Model | Accuracy | Precision | Recall | F1 | ROC-AUC | 5-fold CV ROC-AUC |
