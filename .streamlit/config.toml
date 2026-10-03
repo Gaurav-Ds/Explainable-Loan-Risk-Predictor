@@ -13,5 +13,3 @@ font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;70
 [theme.sidebar]
 backgroundColor = "#0f1a2e"
 
-[server]
-headless = true
