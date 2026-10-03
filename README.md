@@ -204,7 +204,7 @@ the models to `models/` and charts to `reports/figures/`.
 ```bash
 python -m pytest tests -q
 ```
-Expected result: **`21 passed`** (takes 1–2 minutes). See [TEST_REPORT.md](TEST_REPORT.md) for details.
+Expected result: **`23 passed`** (takes 1–2 minutes). See [TEST_REPORT.md](TEST_REPORT.md) for details.
 
 ### Step 7 — Start the dashboard
 ```bash
@@ -217,7 +217,8 @@ If it doesn't, open that address yourself. (If Streamlit asks for an email the f
 1. Click the **🔍 Predict & Explain** tab.
 2. In **"Load a sample applicant"**, choose e.g. *Applicant #…* — or fill in the form yourself.
 3. Click **🔮 Predict risk**.
-4. See the risk gauge, the ✅ Approve / ⛔ Reject decision, the plain-language explanation and the SHAP chart.
+4. See the risk gauge, the ✅ Approve / ⛔ Reject decision, the plain-language explanation and the SHAP chart
+   (switch **Bar chart / Waterfall**), and click **📄 Download explanation report**.
 5. Open **⚖️ Fairness Report** and move the **Decision threshold** slider in the sidebar to see how fairness changes.
 6. Use the **☀️ Light / 🌙 Dark** button (top-right) to switch theme.
 
@@ -238,10 +239,10 @@ streamlit run app.py
 | Tab | What you can do |
 |---|---|
 | 🏠 **Overview** | Project summary (Accurate · Explainable · Auditable), how the system works, objectives, key findings. |
-| 🔍 **Predict & Explain** | Enter applicant details → default probability, risk level, decision, top factors, plain-language summary and SHAP chart. |
+| 🔍 **Predict & Explain** | Enter applicant details → risk gauge, decision, top factors, plain-language explanation, SHAP **bar or waterfall** chart, and a **downloadable explanation report** (HTML). |
 | 📊 **Model Comparison** | Accuracy, precision, recall, F1, ROC-AUC for all 3 models, ROC curves and confusion matrices. |
 | 🌐 **Global Explanation** | Which factors matter most overall (SHAP importance and beeswarm plot). |
-| ⚖️ **Fairness Report** | Approval rates by gender and age group, fairness metrics and a verdict — updates live with the threshold. |
+| ⚖️ **Fairness Report** | Approval rates by gender and age group, fairness metrics and a verdict, plus a chart of **how fairness changes with the threshold**. |
 | 📁 **Dataset** | Default rate by any feature, plus the full raw data. |
 
 **Sidebar:** choose the model (★ = best), set the decision threshold, switch theme.

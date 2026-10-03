@@ -2,7 +2,9 @@
 
 Run with:  streamlit run app.py
 """
+import html
 import json
+from datetime import datetime
 import numbers
 import sys
 from pathlib import Path
@@ -136,14 +138,22 @@ st.markdown(
     [data-testid="stForm"] {{background: {T['card']}; border: 1px solid {T['border']}; border-radius: 18px;
         padding: 1.2rem 1.3rem; box-shadow: {T['shadow']};}}
 
-    /* tabs as pills */
-    .stTabs [data-baseweb="tab-list"] {{gap: .35rem; background: {T['card']}; border: 1px solid {T['border']};
-        padding: .35rem; border-radius: 14px; flex-wrap: wrap;}}
-    .stTabs [data-baseweb="tab"] {{padding: .45rem 1rem; border-radius: 10px; height: auto;}}
-    .stTabs [aria-selected="true"] {{background: {SERIES[0]}; color: #fff !important;}}
-    .stTabs [aria-selected="true"] p {{color: #fff !important;}}
-    .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{display: none;}}
+    /* tabs as pills (Streamlit >= 1.5x renders tabs with role=tablist / data-testid=stTab) */
+    [role="tablist"] {{gap: .3rem; background: {T['card']}; border: 1px solid {T['border']};
+        padding: .35rem; border-radius: 14px; box-shadow: {T['shadow']};}}
+    [data-testid="stTab"] {{padding: .5rem 1rem !important; border-radius: 10px !important; height: auto !important;
+        transition: background .15s ease;}}
+    [data-testid="stTab"]:hover {{background: {T['glow']};}}
+    [data-testid="stTab"][aria-selected="true"] {{background: linear-gradient(120deg, #1c5cab, {SERIES[0]});
+        box-shadow: 0 4px 14px rgba(42,120,214,.35);}}
+    [data-testid="stTab"][aria-selected="true"] p {{color: #fff !important; font-weight: 600;}}
 
+    .why {{background: {T['card']}; border: 1px solid {T['border']}; border-left: 4px solid {SERIES[0]};
+        border-radius: 14px; padding: 1rem 1.2rem; box-shadow: {T['shadow']}; line-height: 1.65;}}
+    .why .lead {{font-size: 1.05rem; margin-bottom: .4rem;}}
+    .why .up {{color: {T['up']}; font-weight: 600;}}
+    .why .down {{color: {T['down']}; font-weight: 600;}}
+    .why p {{margin: .25rem 0;}}
     .stButton > button[kind="primary"], [data-testid="stFormSubmitButton"] > button {{
         background: linear-gradient(120deg, #1c5cab, #2a78d6 55%, #4a3aa7); border: 0; color: #fff;
         font-weight: 600; box-shadow: 0 6px 18px rgba(42,120,214,.35);}}
@@ -161,6 +171,11 @@ st.markdown(
     .verdict {{border-radius: 12px; padding: .8rem 1rem; margin: .5rem 0 .9rem 0; border: 1px solid;}}
     .verdict.ok {{border-color: rgba(12,163,12,.5); background: rgba(12,163,12,.10);}}
     .verdict.warn {{border-color: rgba(236,131,90,.6); background: rgba(236,131,90,.12);}}
+    .mini-stats {{display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;}}
+    .mini-stats div {{background: {T['card']}; border: 1px solid {T['border']}; border-radius: 12px;
+        padding: .55rem .7rem;}}
+    .mini-stats span {{display: block; font-size: .72rem; color: {T['muted']};}}
+    .mini-stats b {{font-size: 1.25rem;}}
     .footer {{text-align: center; color: {T['muted']}; font-size: .8rem; margin-top: 2rem; padding: 1rem 0;
         border-top: 1px solid {T['border']};}}
     </style>
@@ -203,11 +218,11 @@ def global_importance(model_name: str) -> pd.Series:
 
 def style_fig(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_layout(
-        template=T["plotly"], height=height, margin=dict(l=10, r=10, t=48, b=10),
+        template=T["plotly"], height=height, margin=dict(l=10, r=10, t=56, b=10),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, system-ui, sans-serif", color=T["text"], size=13),
         title_font=dict(size=15, color=T["text"]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(color=T["muted"])),
+        legend=dict(orientation="h", yanchor="top", y=-0.16, xanchor="left", x=0, font=dict(color=T["muted"])),
         hoverlabel=dict(font_size=13, bgcolor=T["surface"], bordercolor=T["border"], font_color=T["text"]),
     )
     fig.update_xaxes(gridcolor=T["grid"], zerolinecolor=T["axis"], linecolor=T["axis"], tickfont_color=T["muted"])
@@ -218,6 +233,56 @@ def style_fig(fig: go.Figure, height: int = 360) -> go.Figure:
 def show(fig: go.Figure, height: int = 360, toolbar: bool = True, container=st):
     container.plotly_chart(style_fig(fig, height), width="stretch", theme=None,
                            config={"displayModeBar": toolbar, "displaylogo": False})
+
+
+def esc(text) -> str:
+    return html.escape(str(text))
+
+
+@st.cache_data
+def fairness_sweep(model_name: str) -> pd.DataFrame:
+    """Fairness metrics for every sensitive attribute across decision thresholds 0.10 - 0.90."""
+    _, _, _, _, test = load_artifacts()
+    proba = test_probabilities(model_name)
+    rows = []
+    for thr in [round(t / 100, 2) for t in range(10, 91, 5)]:
+        pred = (proba >= thr).astype(int)
+        for attr in SENSITIVE_ATTRIBUTES:
+            rep = fairness_report(test[TARGET].values, pred, test[attr].values, attr)
+            rows.append({"threshold": thr, "attribute": attr,
+                         "Demographic parity diff.": rep["demographic_parity_difference"],
+                         "Equal opportunity diff.": rep["equal_opportunity_difference"]})
+    return pd.DataFrame(rows)
+
+
+def build_report(row: pd.Series, prob: float, high: bool, threshold: float, model: str,
+                 explanation: pd.DataFrame, summary: str) -> str:
+    """Self-contained, printable HTML report of one prediction and its explanation."""
+    colour = "#d03b3b" if high else "#0a8a0a"
+    decision = "HIGH RISK — Reject / refer for review" if high else "LOW RISK — Approve"
+    details = "".join(f"<tr><td>{esc(FEATURE_LABELS[f])}</td><td>{esc(fmt(row[f]))}</td></tr>" for f in FEATURES)
+    factors = "".join(
+        f"<tr><td>{esc(r.label)}</td><td>{esc(fmt(r.value))}</td>"
+        f"<td style='color:{'#d03b3b' if r.contribution > 0 else '#2a78d6'}'>{r.contribution:+.4f}</td>"
+        f"<td>{esc(r.direction)}</td></tr>"
+        for r in explanation.itertuples()
+    )
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Loan risk explanation</title>
+<style>body{{font-family:Segoe UI,Arial,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#0b1b33}}
+h1{{font-size:1.5rem;margin-bottom:.2rem}} .muted{{color:#5b6b82}} table{{border-collapse:collapse;width:100%;margin:.5rem 0 1.2rem}}
+td,th{{border-bottom:1px solid #dfe5f0;padding:.35rem .5rem;text-align:left;font-size:.92rem}} th{{background:#f5f7fb}}
+.box{{border:2px solid {colour};border-radius:12px;padding:1rem 1.2rem;margin:1rem 0}} .box h2{{color:{colour};margin:0 0 .3rem}}
+</style></head><body>
+<h1>Explainable Loan Risk Predictor — Decision explanation</h1>
+<div class="muted">Generated {datetime.now():%d %b %Y, %H:%M} · Model: {esc(model)} · Decision threshold {threshold:.0%}</div>
+<div class="box"><h2>{decision}</h2>Estimated probability of default: <b>{prob:.1%}</b></div>
+<h3>Why? (plain language)</h3><p>{esc(summary)}</p>
+<h3>Factor contributions (SHAP)</h3>
+<table><tr><th>Factor</th><th>Value</th><th>Contribution</th><th>Effect</th></tr>{factors}</table>
+<h3>Applicant details</h3><table>{details}</table>
+<p class="muted">SHAP contributions approximate how each factor moved this prediction relative to the average applicant.
+This report supports, and does not replace, a human credit decision.</p>
+</body></html>"""
 
 
 def fmt(v) -> str:
@@ -237,11 +302,11 @@ models, metrics, data, train, test = load_artifacts()
 best_name = metrics["best_model"]
 
 FORM_SECTIONS = {
-    "👤 Personal": ["age", "num_dependents", "job", "employment_since", "housing", "residence_since",
-                   "telephone", "foreign_worker"],
-    "💰 Finances": ["checking_status", "savings", "property", "existing_credits"],
+    "👤 Personal": ["age", "num_dependents", "residence_since", "telephone", "foreign_worker"],
+    "💼 Work & assets": ["job", "employment_since", "housing", "property"],
+    "💰 Credit profile": ["checking_status", "savings", "credit_history", "existing_credits",
+                         "other_installment_plans"],
     "📄 Loan request": ["credit_amount", "duration_months", "purpose", "installment_rate", "other_debtors"],
-    "🧾 Credit history": ["credit_history", "other_installment_plans"],
 }
 assert sorted(sum(FORM_SECTIONS.values(), [])) == sorted(FEATURES)
 
@@ -264,9 +329,11 @@ with st.sidebar:
         help="Applicants with a default probability at or above this value are classed as HIGH risk.",
     )
     m = metrics["models"][model_name]
-    c1, c2 = st.columns(2)
-    c1.metric("Test AUC", f"{m['roc_auc']:.3f}")
-    c2.metric("CV AUC", f"{m['cv_roc_auc_mean']:.3f}")
+    st.markdown(
+        f'<div class="mini-stats"><div><span>Test ROC-AUC</span><b>{m["roc_auc"]:.3f}</b></div>'
+        f'<div><span>CV ROC-AUC</span><b>{m["cv_roc_auc_mean"]:.3f}</b></div></div>',
+        unsafe_allow_html=True,
+    )
     st.divider()
     with st.expander("ℹ️ About this project"):
         st.markdown(
@@ -333,7 +400,7 @@ with tab_home:
         unsafe_allow_html=True)
     pillars[2].markdown(card(
         "⚖️", "Auditable", "Demographic Parity &amp; Equal Opportunity checked across gender and age.",
-        f"{n_flag} of {len(fair_all)} attributes flagged", SERIES[2]), unsafe_allow_html=True)
+        f"{n_flag} / {len(fair_all)} flagged", SERIES[2]), unsafe_allow_html=True)
 
     st.markdown("#### 🧩 How the system works")
     steps = [
@@ -431,9 +498,12 @@ with tab_predict:
         if outside:
             st.warning("Some values are outside the range seen during training, so this prediction is less "
                        "reliable: " + "; ".join(outside) + ".", icon="⚠️")
-        prob = float(pipeline.predict_proba(applicant)[0, 1])
-        high = prob >= threshold
-        explanation = explainer.explain_applicant(applicant)
+        with st.spinner("Analysing applicant and computing SHAP explanation…"):
+            prob = float(pipeline.predict_proba(applicant)[0, 1])
+            high = prob >= threshold
+            explanation = explainer.explain_applicant(applicant)
+        if submitted:
+            st.toast(f"Prediction ready — {'HIGH' if high else 'LOW'} risk ({prob:.1%})", icon="⛔" if high else "✅")
 
         st.markdown("#### 📋 Result")
         g_col, d_col = st.columns([1, 1.4])
@@ -447,13 +517,17 @@ with tab_predict:
                     "axis": {"range": [0, 100], "ticksuffix": "%", "tickcolor": T["axis"],
                              "tickfont": {"color": T["muted"]}},
                     "bar": {"color": T["bad"] if high else T["good"], "thickness": 0.3},
-                    "bgcolor": T["grid"], "borderwidth": 0,
+                    "bgcolor": "rgba(0,0,0,0)", "borderwidth": 0,
+                    "steps": [
+                        {"range": [0, threshold * 100], "color": "rgba(12,163,12,0.16)"},
+                        {"range": [threshold * 100, 100], "color": "rgba(208,59,59,0.16)"},
+                    ],
                     "threshold": {"line": {"color": T["text"], "width": 3}, "thickness": 0.9,
                                   "value": threshold * 100},
                 },
             ))
             show(gauge, 280, toolbar=False)
-            st.caption(f"Marker = decision threshold ({threshold:.0%}).")
+            st.caption(f"Green zone = approve · red zone = reject · marker = threshold ({threshold:.0%}).")
 
         with d_col:
             if high:
@@ -481,34 +555,88 @@ with tab_predict:
             with f1:
                 st.markdown('<div class="section-label">▲ Raised the risk</div>', unsafe_allow_html=True)
                 for r in up.itertuples():
-                    st.markdown(f'<div class="factor"><span>{r.label}</span><span class="val">{fmt(r.value)}</span></div>',
+                    st.markdown(f'<div class="factor"><span>{esc(r.label)}</span><span class="val">{esc(fmt(r.value))}</span></div>',
                                 unsafe_allow_html=True)
             with f2:
                 st.markdown('<div class="section-label">▼ Lowered the risk</div>', unsafe_allow_html=True)
                 for r in down.itertuples():
-                    st.markdown(f'<div class="factor"><span>{r.label}</span><span class="val">{fmt(r.value)}</span></div>',
+                    st.markdown(f'<div class="factor"><span>{esc(r.label)}</span><span class="val">{esc(fmt(r.value))}</span></div>',
                                 unsafe_allow_html=True)
 
+        summary = plain_language_summary(prob, explanation, threshold)
         st.markdown("#### 💬 Why? In plain language")
-        st.info(plain_language_summary(prob, explanation, threshold), icon="💡")
+        up_txt = "; ".join(f"{esc(r.label)} = {esc(fmt(r.value))}" for r in up.itertuples())
+        down_txt = "; ".join(f"{esc(r.label)} = {esc(fmt(r.value))}" for r in down.itertuples())
+        top_f = explanation.iloc[0]
+        st.markdown(
+            f'<div class="why"><div class="lead">The model estimates a <b>{prob:.1%}</b> probability that this '
+            f'applicant will default — <b>{"HIGH" if high else "LOW"} risk</b> at the {threshold:.0%} threshold.</div>'
+            + (f'<p><span class="up">▲ Increased the risk:</span> {up_txt}.</p>' if up_txt else "")
+            + (f'<p><span class="down">▼ Decreased the risk:</span> {down_txt}.</p>' if down_txt else "")
+            + f'<p>💡 The single most influential factor was <b>{esc(top_f.label.lower())}</b> '
+              f'({esc(fmt(top_f.value))}), which {top_f.direction}.</p></div>',
+            unsafe_allow_html=True,
+        )
 
         st.markdown("#### 📊 Feature contributions (SHAP)")
-        n_show = st.slider("Number of factors to show", 5, len(FEATURES), 10, key="n_factors")
-        top = explanation.head(n_show)[::-1]
-        bar = go.Figure(go.Bar(
-            x=top["contribution"], y=[f"{l} = {fmt(v)}" for l, v in zip(top["label"], top["value"])],
-            orientation="h",
-            marker=dict(color=[T["up"] if c > 0 else T["down"] for c in top["contribution"]], cornerradius=4),
-            customdata=top["direction"],
-            hovertemplate="<b>%{y}</b><br>%{customdata}<br>SHAP contribution: %{x:+.4f}<extra></extra>",
-        ))
-        bar.add_vline(x=0, line_color=T["axis"], line_width=1)
-        bar.update_layout(
-            title=dict(text=f"<span style='color:{T['up']}'>■</span> increases risk &nbsp; "
-                            f"<span style='color:{T['down']}'>■</span> decreases risk"),
-            xaxis_title=f"Contribution to default risk ({explanation.attrs['units']})", bargap=0.3,
+        o1, o2 = st.columns([1, 2], vertical_alignment="bottom")
+        view = o1.segmented_control("Chart type", ["Bar chart", "Waterfall"], default="Bar chart", key="shap_view")
+        n_show = o2.slider("Number of factors to show", 5, len(FEATURES), 10, key="n_factors")
+        units = explanation.attrs["units"]
+        if view == "Waterfall":
+            shown = explanation.head(n_show)
+            rest = explanation["contribution"].iloc[n_show:].sum()
+            base = explanation.attrs["base_value"]
+            labels = (["Average applicant (base)"]
+                      + [f"{l} = {fmt(v)}" for l, v in zip(shown["label"], shown["value"])]
+                      + ([f"{len(explanation) - n_show} other factors"] if n_show < len(explanation) else [])
+                      + ["This applicant"])
+            vals = [base] + list(shown["contribution"]) + ([rest] if n_show < len(explanation) else []) + [0]
+            measure = ["absolute"] + ["relative"] * (len(vals) - 2) + ["total"]
+            wf = go.Figure(go.Waterfall(
+                orientation="h", y=labels, x=vals, measure=measure,
+                increasing=dict(marker=dict(color=T["up"])), decreasing=dict(marker=dict(color=T["down"])),
+                totals=dict(marker=dict(color=SERIES[0])),
+                connector=dict(line=dict(color=T["axis"], width=1, dash="dot")),
+                hovertemplate="<b>%{y}</b><br>%{x:+.4f}<extra></extra>",
+            ))
+            wf.update_yaxes(autorange="reversed")
+            # Zoom the x-axis onto where the steps happen (bars still start from 0 off-screen).
+            path = [base] + list(base + pd.Series(vals[1:-1]).cumsum())
+            lo, hi = min(path), max(path)
+            pad = max((hi - lo) * 0.15, 0.01)
+            wf.update_xaxes(range=[lo - pad, hi + pad])
+            wf.update_layout(
+                title=f"From the average applicant to this applicant ({units})",
+                xaxis_title=f"Model output ({units})", showlegend=False,
+            )
+            show(wf, 170 + 32 * len(labels))
+            st.caption("Starts from the model's average output, adds each factor's SHAP contribution in turn, "
+                       "and ends at this applicant's output." + (" Output is in log-odds for this model."
+                                                                 if units == "log-odds" else ""))
+        else:
+            top = explanation.head(n_show)[::-1]
+            bar = go.Figure(go.Bar(
+                x=top["contribution"], y=[f"{l} = {fmt(v)}" for l, v in zip(top["label"], top["value"])],
+                orientation="h",
+                marker=dict(color=[T["up"] if c > 0 else T["down"] for c in top["contribution"]], cornerradius=4),
+                customdata=top["direction"],
+                hovertemplate="<b>%{y}</b><br>%{customdata}<br>SHAP contribution: %{x:+.4f}<extra></extra>",
+            ))
+            bar.add_vline(x=0, line_color=T["axis"], line_width=1)
+            bar.update_layout(
+                title=dict(text=f"<span style='color:{T['up']}'>■</span> increases risk &nbsp; "
+                                f"<span style='color:{T['down']}'>■</span> decreases risk"),
+                xaxis_title=f"Contribution to default risk ({units})", bargap=0.3,
+            )
+            show(bar, 130 + 32 * n_show)
+
+        st.download_button(
+            "📄 Download explanation report",
+            data=build_report(applicant.iloc[0], prob, high, threshold, model_name, explanation, summary),
+            file_name="loan-risk-explanation.html", mime="text/html", width="stretch",
+            help="A printable report of this decision and its explanation, e.g. to share with the applicant.",
         )
-        show(bar, 130 + 32 * n_show)
 
         with st.expander("📋 Full contribution table"):
             st.dataframe(
@@ -561,6 +689,8 @@ with tab_models:
     roc.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Random guess",
                     line=dict(color=T["muted"], dash="dash", width=1), hoverinfo="skip")
     roc.update_layout(title="ROC curves", xaxis_title="False positive rate", yaxis_title="True positive rate")
+    roc.update_layout(legend=dict(orientation="v", yanchor="bottom", y=0.03, xanchor="right", x=0.98,
+                                  bgcolor=T["surface"], bordercolor=T["border"], borderwidth=1))
     show(roc, 400, container=c2)
 
     st.markdown("#### 🧮 Confusion matrices")
@@ -644,16 +774,40 @@ with tab_fair:
                              yaxis=dict(range=[0, 1.12], tickformat=".0%"))
             show(fb, 320, toolbar=False, container=c1)
             with c2:
-                st.dataframe(
-                    groups.rename(columns={
-                        "count": "Applicants", "actual_good_rate": "Actually repaid", "approval_rate": "Approved",
-                        "true_approval_rate": "Repayers approved", "false_approval_rate": "Defaulters approved",
-                    }),
-                    width="stretch",
-                    column_config={c: st.column_config.NumberColumn(format="percent") for c in
-                                   ["Actually repaid", "Approved", "Repayers approved", "Defaulters approved"]},
-                )
+                rows = {
+                    "Test applicants": groups["count"].map("{:,.0f}".format),
+                    "Actually repaid": groups["actual_good_rate"].map("{:.1%}".format),
+                    "Approved by model": groups["approval_rate"].map("{:.1%}".format),
+                    "Repayers approved": groups["true_approval_rate"].map("{:.1%}".format),
+                    "Defaulters approved": groups["false_approval_rate"].map("{:.1%}".format),
+                }
+                table = pd.DataFrame(rows).T
+                table.columns.name = None
+                st.dataframe(table, width="stretch")
                 st.caption(f"Least favoured group: **{rep['least_favoured_group']}**")
+    st.markdown("#### 🎚️ How fairness changes with the decision threshold")
+    metric = st.segmented_control("Fairness metric", ["Demographic parity diff.", "Equal opportunity diff."],
+                                  default="Demographic parity diff.", key="sweep_metric") or "Demographic parity diff."
+    sweep = fairness_sweep(model_name)
+    sw = go.Figure()
+    for i, attr in enumerate(SENSITIVE_ATTRIBUTES):
+        d = sweep[sweep["attribute"] == attr]
+        sw.add_scatter(
+            x=d["threshold"], y=d[metric], mode="lines+markers", name=attr.replace("_", " ").title(),
+            line=dict(color=SERIES[i], width=2), marker=dict(size=8, line=dict(width=2, color=T["bg"])),
+            hovertemplate=f"<b>{attr.replace('_', ' ').title()}</b><br>Threshold %{{x:.0%}}<br>{metric}: %{{y:.3f}}<extra></extra>",
+        )
+    sw.add_hrect(y0=0, y1=0.1, fillcolor="rgba(12,163,12,0.10)", line_width=0)
+    sw.add_hline(y=0.1, line_dash="dash", line_color=T["muted"], annotation_text="0.10 tolerance",
+                 annotation_position="top left", annotation_font_color=T["muted"])
+    sw.add_vline(x=threshold, line_color=T["text"], line_width=1.5, annotation_text=f"current {threshold:.0%}",
+                 annotation_position="top right", annotation_font_color=T["text"])
+    sw.update_layout(xaxis=dict(title="Decision threshold", tickformat=".0%"),
+                     yaxis=dict(title=metric, rangemode="tozero"), hovermode="x unified")
+    show(sw, 380)
+    st.caption("Green band = within the 0.10 tolerance. A lower threshold rejects more applicants; the gap between "
+               "groups changes with it — this is the accuracy / fairness trade-off a lender must choose.")
+
     with st.expander("📘 How to read these metrics"):
         st.markdown(
             "- **Demographic parity difference** — gap between the highest and lowest group approval rates.\n"

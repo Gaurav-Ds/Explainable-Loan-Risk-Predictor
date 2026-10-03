@@ -30,7 +30,8 @@ def predict(at):
 
 
 def result_text(at):
-    return [i.value for i in at.info if "probability" in i.value]
+    """The plain-language explanation card shown with every prediction."""
+    return [m.value for m in at.markdown if 'class="why"' in m.value and "probability" in m.value]
 
 
 @pytest.fixture
@@ -70,6 +71,17 @@ def test_custom_result_survives_other_widget_changes(app):
     slider(app, "Decision threshold").set_value(0.3).run()
     assert not app.exception
     assert result_text(app), "result must not disappear after changing a slider"
+
+
+@pytest.mark.parametrize("model", ["Random Forest", "Logistic Regression"])
+def test_waterfall_view_and_report_download(app, model):
+    selectbox(app, "Classifier").set_value(model).run()
+    sample = selectbox(app, "Load a sample applicant")
+    sample.set_value(sample.options[1]).run()
+    app.session_state["shap_view"] = "Waterfall"
+    app.run()
+    assert not app.exception
+    assert app.get("download_button"), "download report button should be shown with a result"
 
 
 def test_input_bounds_are_realistic(app):

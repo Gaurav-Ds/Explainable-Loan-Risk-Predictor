@@ -74,7 +74,7 @@ def plain_language_summary(probability: float, explanation: pd.DataFrame, thresh
     """Turn a SHAP explanation into a short, non-technical paragraph."""
     level = "HIGH" if probability >= threshold else "LOW"
     lines = [
-        f"The model estimates a {probability:.0%} probability that this applicant will default, "
+        f"The model estimates a {probability:.1%} probability that this applicant will default, "
         f"which is classed as {level} risk (threshold {threshold:.0%})."
     ]
 
